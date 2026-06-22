@@ -1,5 +1,7 @@
 //! Error types for any problems this runs into, including internal BYOND errors.
-use std::ffi::{CStr, CString};
+#[cfg(not(feature = "byond-516-1682"))]
+use std::ffi::CStr;
+use std::ffi::CString;
 
 use crate::{prelude::ByondValue, static_global::byond};
 
@@ -77,15 +79,48 @@ impl std::error::Error for Error {}
 pub struct ByondError(pub CString);
 
 impl ByondError {
+    #[cfg(not(feature = "byond-516-1682"))]
     pub fn get_last() -> Option<Self> {
-        // Safety: It's always safe to call Byond_LastError
+        // Safety: It's always safe to call Byond_LastError.
         let ptr = unsafe { byond().Byond_LastError() };
         if !ptr.is_null() {
-            // Safety: We just have to trust that Byond gave us a valid cstring...
+            // Safety: We have to trust that BYOND gave us a valid C string.
             let cstr = unsafe { CStr::from_ptr(ptr) };
             Some(ByondError(cstr.to_owned()))
         } else {
             None
+        }
+    }
+
+    #[cfg(feature = "byond-516-1682")]
+    pub fn get_last() -> Option<Self> {
+        let mut len = 256u32;
+        let mut buffer = vec![0u8; len as usize];
+
+        let mut success = unsafe {
+            byond().Byond_LastError(buffer.as_mut_ptr().cast(), &mut len)
+        };
+        if !success {
+            if len as usize > buffer.len() {
+                buffer = vec![0u8; len as usize];
+                success = unsafe {
+                    byond().Byond_LastError(buffer.as_mut_ptr().cast(), &mut len)
+                };
+            }
+            if !success {
+                return None;
+            }
+        }
+
+        buffer.truncate((len as usize).min(buffer.len()));
+        if let Some(nul_pos) = buffer.iter().position(|byte| *byte == 0) {
+            buffer.truncate(nul_pos);
+        }
+
+        if buffer.is_empty() {
+            None
+        } else {
+            CString::new(buffer).ok().map(ByondError)
         }
     }
 }

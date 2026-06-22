@@ -26,6 +26,8 @@ mod byond_rawbind {
     include!(concat!(env!("OUT_DIR"), "/bindings_515_1621.rs"));
     #[cfg(feature = "byond-516-1651")]
     include!(concat!(env!("OUT_DIR"), "/bindings_516_1651.rs"));
+    #[cfg(feature = "byond-516-1682")]
+    include!(concat!(env!("OUT_DIR"), "/bindings_516_1682.rs"));
 }
 
 #[cfg(doc)]
@@ -104,7 +106,7 @@ pub use byond_rawbind::u8c;
 pub use byond_rawbind::ByondCallback;
 pub use byond_rawbind::ByondValueData;
 pub use byond_rawbind::ByondValueType;
-#[cfg(feature = "byond-516-1651")]
+#[cfg(any(feature = "byond-516-1651", feature = "byond-516-1682"))]
 pub use byond_rawbind::CByondPixLoc;
 pub use byond_rawbind::CByondValue;
 pub use byond_rawbind::CByondXYZ;

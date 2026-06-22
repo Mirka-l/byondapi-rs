@@ -24,7 +24,8 @@ bindgen = "0.71"
 doxygen-rs = "0.4"
 
 [features]
-default = ["byond-516-1651"]
+default = ["byond-516-1682"]
 byond-515-1621 = []
 byond-516-1651 = []
+byond-516-1682 = []
 opendream = []
