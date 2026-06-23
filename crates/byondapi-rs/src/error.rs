@@ -94,34 +94,39 @@ impl ByondError {
 
     #[cfg(feature = "byond-516-1682")]
     pub fn get_last() -> Option<Self> {
-        let mut len = 256u32;
-        let mut buffer = vec![0u8; len as usize];
+        use std::cell::RefCell;
 
-        let mut success = unsafe {
-            byond().Byond_LastError(buffer.as_mut_ptr().cast(), &mut len)
-        };
-        if !success {
-            if len as usize > buffer.len() {
-                buffer = vec![0u8; len as usize];
-                success = unsafe {
-                    byond().Byond_LastError(buffer.as_mut_ptr().cast(), &mut len)
-                };
+        thread_local! {
+            static BUFFER: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(1));
+        }
+
+        let bytes = BUFFER.with_borrow_mut(|buff| -> Option<Vec<u8>> {
+            let mut len = buff.capacity() as u32;
+            let initial_res =
+                unsafe { byond().Byond_LastError(buff.as_mut_ptr().cast(), &mut len) };
+            match (initial_res, len) {
+                (false, 1..) => {
+                    buff.reserve_exact(len as usize);
+                    if unsafe { byond().Byond_LastError(buff.as_mut_ptr().cast(), &mut len) } {
+
+                        unsafe { buff.set_len(len as usize) };
+                        Some(std::mem::take(buff))
+                    } else {
+                        None
+                    }
+                }
+                (true, _) => {
+                    unsafe { buff.set_len(len as usize) };
+                    Some(std::mem::take(buff))
+                }
+                (false, 0) => None,
             }
-            if !success {
-                return None;
-            }
-        }
+        })?;
 
-        buffer.truncate((len as usize).min(buffer.len()));
-        if let Some(nul_pos) = buffer.iter().position(|byte| *byte == 0) {
-            buffer.truncate(nul_pos);
-        }
-
-        if buffer.is_empty() {
-            None
-        } else {
-            CString::new(buffer).ok().map(ByondError)
-        }
+        CString::from_vec_with_nul(bytes)
+            .ok()
+            .filter(|err| !err.as_bytes().is_empty())
+            .map(ByondError)
     }
 }
 
